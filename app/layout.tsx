@@ -9,7 +9,6 @@ export const metadata: Metadata = {
   title: "QuickContact - Find Business Contact Info Instantly",
   description:
     "Quickly find businesses and view their contact information - phone, website, address, rating, and reviews",
-  generator: "v0.app",
 }
 
 export default function RootLayout({
@@ -17,11 +16,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const isNetlify = process.env.NETLIFY === "true" || process.env.NETLIFY === "1"
+  const disableAnalytics = isNetlify || process.env.NEXT_PUBLIC_DISABLE_ANALYTICS === "1"
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
         <LanguageProvider>{children}</LanguageProvider>
-        <Analytics />
+        {!disableAnalytics && <Analytics />}
         <Toaster />
       </body>
     </html>
