@@ -1,0 +1,20 @@
+#!/bin/sh
+# Auto-push the current branch after every commit.
+set -e
+
+REMOTE="${REMOTE:-origin}"
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# If no remote is configured, exit quietly
+REMOTE_URL=$(git config --get remote."$REMOTE".url || true)
+if [ -z "$REMOTE_URL" ]; then
+  echo "[post-commit] No remote '$REMOTE' configured; skipping push." >&2
+  exit 0
+fi
+
+echo "[post-commit] Pushing '$BRANCH' to '$REMOTE'..." >&2
+git push -u "$REMOTE" "$BRANCH" || {
+  echo "[post-commit] Push failed; commit completed locally." >&2
+  exit 0
+}
+echo "[post-commit] Push succeeded." >&2
