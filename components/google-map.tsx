@@ -95,7 +95,8 @@ export default function GoogleMap({ businesses, selectedPlaceId, onMarkerClick }
 
     mapsApiPromiseRef.current = new Promise<void>((resolve, reject) => {
       const script = document.createElement("script")
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker`
+      // Use v=weekly to ensure modern loader APIs like importLibrary are available
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=places,marker`
       script.async = true
       script.defer = true
 
@@ -133,10 +134,9 @@ export default function GoogleMap({ businesses, selectedPlaceId, onMarkerClick }
     console.log("[v0] Initializing Google Map instance")
 
     try {
-      const map = new window.google.maps.Map(mapRef.current, {
+      const mapOptions: any = {
         zoom: 13,
         center: { lat: 41.0082, lng: 28.9784 },
-        mapId: "DEMO_MAP_ID",
         styles: [
           {
             featureType: "all",
@@ -169,7 +169,14 @@ export default function GoogleMap({ businesses, selectedPlaceId, onMarkerClick }
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: true,
-      })
+        gestureHandling: "cooperative",
+        scrollwheel: false,
+      }
+      const envMapId = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID
+      if (envMapId) {
+        mapOptions.mapId = envMapId
+      }
+      const map = new window.google.maps.Map(mapRef.current, mapOptions)
 
       googleMapRef.current = map
       // Clear selection when clicking on the map background
@@ -205,29 +212,49 @@ export default function GoogleMap({ businesses, selectedPlaceId, onMarkerClick }
 
     // Import Advanced Marker library once per render cycle
     const createAll = async () => {
-      const { AdvancedMarkerElement, PinElement } = await window.google.maps.importLibrary("marker")
-      markerLibRef.current = { AdvancedMarkerElement, PinElement }
+      let AdvancedMarkerElement: any = null
+      let PinElement: any = null
+      try {
+        const lib = await window.google.maps.importLibrary?.("marker")
+        AdvancedMarkerElement = lib?.AdvancedMarkerElement
+        PinElement = lib?.PinElement
+      } catch (e) {
+        // Fallback: importLibrary may not exist; we'll use classic Marker
+        console.warn("[v0] Advanced Marker library unavailable; falling back to google.maps.Marker")
+      }
+      markerLibRef.current = AdvancedMarkerElement && PinElement ? { AdvancedMarkerElement, PinElement } : null
 
       businesses.forEach((business, idx) => {
         const position = {
           lat: business.geometry.location.lat,
           lng: business.geometry.location.lng,
         }
-
-        // Default pin shows list number on every marker
-        const defaultPin = new PinElement({
-          background: "#3b82f6",
-          borderColor: "#ffffff",
-          glyphColor: "#081b26",
-          scale: 1.1,
-          glyph: (idx + 1).toString(),
-        })
-        const marker = new AdvancedMarkerElement({
-          position,
-          title: business.name,
-          map: googleMapRef.current,
-          content: defaultPin.element,
-        })
+        let marker: any
+        let defaultPin: any = null
+        if (markerLibRef.current?.AdvancedMarkerElement && markerLibRef.current?.PinElement) {
+          // Default pin shows list number on every marker
+          defaultPin = new markerLibRef.current.PinElement({
+            background: "#3b82f6",
+            borderColor: "#ffffff",
+            glyphColor: "#081b26",
+            scale: 1.1,
+            glyph: (idx + 1).toString(),
+          })
+          marker = new markerLibRef.current.AdvancedMarkerElement({
+            position,
+            title: business.name,
+            map: googleMapRef.current,
+            content: defaultPin.element,
+          })
+        } else {
+          // Fallback to classic Marker with label for number
+          marker = new window.google.maps.Marker({
+            position,
+            title: business.name,
+            map: googleMapRef.current,
+            label: (idx + 1).toString(),
+          })
+        }
 
         // Prepare a readable overlay above the pin showing list number and ID; phone shown below
         const phone = business.formatted_phone_number?.trim()
@@ -256,12 +283,8 @@ export default function GoogleMap({ businesses, selectedPlaceId, onMarkerClick }
         marker.addListener("dblclick", () => {
           onMarkerClick(null)
         })
-        // Touch devices support
-        marker.addListener("touchend", () => {
-          debouncedSelect(business.place_id)
-          onMarkerClick(business.place_id)
-        })
 
+        
         markersRef.current.push(marker)
         markersMapRef.current[business.place_id] = { marker, index: idx, phone: business.formatted_phone_number || "", info, defaultPin }
         bounds.extend(position)
@@ -281,14 +304,12 @@ export default function GoogleMap({ businesses, selectedPlaceId, onMarkerClick }
 
   // Helper: show marker with a quick drop + fade, hide instantly
   const showMarker = (marker: any) => {
-    try {
-      marker.map = googleMapRef.current
-    } catch {}
+    try { marker.setMap(googleMapRef.current) } catch {}
+    try { marker.map = googleMapRef.current } catch {}
   }
   const hideMarker = (marker: any) => {
-    try {
-      marker.map = null
-    } catch {}
+    try { marker.setMap(null) } catch {}
+    try { marker.map = null } catch {}
   }
 
   // Update marker styles and visibility when selection changes
@@ -302,7 +323,7 @@ export default function GoogleMap({ businesses, selectedPlaceId, onMarkerClick }
         // Replace pin content with a highlighted pin showing row number
         try {
           const PinElement = markerLibRef.current?.PinElement
-          if (PinElement) {
+          if (PinElement && marker.content !== undefined) {
             const selectedPin = new PinElement({
               background: "#06b6d4",
               borderColor: "#ffffff",
@@ -389,7 +410,7 @@ export default function GoogleMap({ businesses, selectedPlaceId, onMarkerClick }
       className="relative w-full h-full rounded-xl border border-cyan-500/20 shadow-lg overflow-hidden bg-[#0f0f1a]"
       style={{ ["--pin-transition-duration" as any]: `${transitionDurationMs}ms` }}
     >
-      <div ref={mapRef} className="absolute inset-0 w-full h-full" />
+      <div ref={mapRef} className="absolute inset-0 w-full h-full" style={{ touchAction: "pan-y" }} />
       {!isLoaded && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0f0f1a] z-10">
           <div className="w-[90%] max-w-[360px] space-y-3">

@@ -17,7 +17,9 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   const isNetlify = process.env.NETLIFY === "true" || process.env.NETLIFY === "1"
-  const disableAnalytics = isNetlify || process.env.NEXT_PUBLIC_DISABLE_ANALYTICS === "1"
+  const isVercel = process.env.VERCEL === "true" || process.env.VERCEL === "1"
+  // Disable analytics locally and on non-Vercel environments unless explicitly enabled
+  const disableAnalytics = !isVercel || isNetlify || process.env.NEXT_PUBLIC_DISABLE_ANALYTICS === "1"
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>

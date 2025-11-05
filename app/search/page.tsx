@@ -111,8 +111,10 @@ export default function SearchPage() {
 
       const data = await response.json().catch(() => ({ error: t.errorMessage, results: [] }))
 
-      if (!response.ok) {
+      // Show server-provided error even if response status is 200
+      if (!response.ok || typeof data?.error === 'string') {
         setError(typeof data?.error === 'string' ? data.error : t.errorMessage)
+        setBusinesses([])
         return
       }
 
@@ -131,7 +133,7 @@ export default function SearchPage() {
         // noop
       }
 
-      if (!data.results || data.results.length === 0) {
+      if ((!data.results || data.results.length === 0) && !data.error) {
         setError(t.noResults)
       }
     } catch (err) {
@@ -371,21 +373,12 @@ export default function SearchPage() {
                 <Card
                   key={business.place_id ?? `${business.name}-${business.geometry.location.lat}-${business.geometry.location.lng}-${index}`}
                   id={`business-${business.place_id}`}
-                  className={`bg-white/[0.03] backdrop-blur-sm border border-cyan-500/15 hover:border-cyan-400/40 transition-all duration-300 p-6 cursor-pointer ${
+                  className={`bg-white/[0.03] backdrop-blur-sm border border-cyan-500/15 hover:border-cyan-400/40 transition-all duration-300 p-6 ${
                     selectedPlaceId === business.place_id ? "ring-2 ring-cyan-400 border-cyan-400 shadow-[0_0_0_10px_rgba(6,182,212,0.12)]" : ""
                   }`}
-                  onClick={() => handleBusinessClick(business.place_id)}
-                  onDoubleClick={() => setSelectedPlaceId(null)}
                   ref={(el) => {
                     cardRefs.current[business.place_id] = el as HTMLDivElement
                   }}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      handleBusinessClick(business.place_id)
-                    }
-                  }}
-                  onTouchEnd={() => handleBusinessClick(business.place_id)}
                 >
                   <div className="space-y-4">
                     {/* Business Name & Rating */}
@@ -543,31 +536,22 @@ export default function SearchPage() {
               ))}
             </div>
 
-            {/* Map */}
+            {/* Map open in new tab */}
             <div className="order-1 lg:order-2 lg:sticky lg:top-[200px] h-[400px] lg:h-[calc(100vh-250px)]">
-              <GoogleMap
-                businesses={filteredSorted}
-                selectedPlaceId={selectedPlaceId}
-                onMarkerClick={(placeId) => {
-                  // Single-click selects; passing null clears (map background or dblclick)
-                  if (placeId) {
-                    const idx = filteredSorted.findIndex((b) => b.place_id === placeId)
-                    if (idx === -1) {
-                      toast({
-                        variant: "destructive",
-                        title: "Eşleşme bulunamadı",
-                        description: "Haritadaki numara ile kartvizit verisi eşleşmedi.",
-                      })
-                      return
-                    }
-                    setSelectedPlaceId(placeId)
-                    // Auto scroll disabled
-                  } else {
-                    setSelectedPlaceId(null)
-                  }
-                  // Auto scroll disabled per request
-                }}
-              />
+              <div className="h-full rounded-xl border border-cyan-500/20 bg-white/5 backdrop-blur-sm flex items-center justify-center p-6">
+                <div className="text-center space-y-3">
+                  <div className="text-cyan-100/70 text-sm">Harita bu sayfada gösterilmiyor.</div>
+                  <a
+                    href={`/map?location=${encodeURIComponent(location)}&keyword=${encodeURIComponent(keyword)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-cyan-500/30 bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg"
+                  >
+                    Yeni sekmede haritayı aç
+                  </a>
+                  <div className="text-xs text-cyan-100/60">Numaraya göre mekan isimlerini orada görebilirsiniz.</div>
+                </div>
+              </div>
             </div>
           </div>
         )}
