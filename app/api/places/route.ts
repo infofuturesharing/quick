@@ -73,12 +73,20 @@ export async function GET(request: NextRequest) {
           if (detailsData.status === "OK") {
             return detailsData.result
           }
-          return place
+          // Mark incomplete when details could not be resolved
+          return { ...place, _incomplete: true }
         }),
       )
 
-      console.log("[v0] Returning", detailedTextPlaces.length, "detailed places (text search fallback)")
-      return NextResponse.json({ results: detailedTextPlaces })
+      const validTextPlaces = detailedTextPlaces.filter((p: any) => {
+        const hasId = !!p.place_id
+        const hasGeo = !!p.geometry?.location?.lat && !!p.geometry?.location?.lng
+        return hasId && hasGeo
+      })
+      const incompleteTextCount = detailedTextPlaces.length - validTextPlaces.length
+
+      console.log("[v0] Returning", validTextPlaces.length, "valid places (text search fallback)", "incomplete:", incompleteTextCount)
+      return NextResponse.json({ results: validTextPlaces, meta: { incomplete_count: incompleteTextCount } })
     }
     const { lat, lng } = geocodeData.results[0].geometry.location
     const radius = Math.max(100, Math.min(Number(radiusParam || 3000), 50000)) // default 3km, clamp to [100, 50km]
@@ -145,12 +153,20 @@ export async function GET(request: NextRequest) {
         if (detailsData.status === "OK") {
           return detailsData.result
         }
-        return place
+        // Mark incomplete when details could not be resolved
+        return { ...place, _incomplete: true }
       }),
     )
 
-    console.log("[v0] Returning", detailedPlaces.length, "detailed places")
-    return NextResponse.json({ results: detailedPlaces })
+    const validPlaces = detailedPlaces.filter((p: any) => {
+      const hasId = !!p.place_id
+      const hasGeo = !!p.geometry?.location?.lat && !!p.geometry?.location?.lng
+      return hasId && hasGeo
+    })
+    const incompleteCount = detailedPlaces.length - validPlaces.length
+
+    console.log("[v0] Returning", validPlaces.length, "valid places", "incomplete:", incompleteCount)
+    return NextResponse.json({ results: validPlaces, meta: { incomplete_count: incompleteCount } })
   } catch (error) {
     console.error("[v0] Error fetching places:", error)
     return NextResponse.json({ error: "Internal server error", results: [] }, { status: 500 })

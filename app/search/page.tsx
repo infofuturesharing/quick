@@ -118,6 +118,19 @@ export default function SearchPage() {
 
       setBusinesses(Array.isArray(data.results) ? data.results : [])
 
+      // Warn if API indicates incomplete records were filtered out
+      try {
+        const incompleteCount = Number(data?.meta?.incomplete_count ?? 0)
+        if (incompleteCount > 0) {
+          toast({
+            title: "Eksik veri tespit edildi",
+            description: `${incompleteCount} kayıt detay/konum olmadan geldi; eşleşme sorunları olabilir.`,
+          })
+        }
+      } catch (_) {
+        // noop
+      }
+
       if (!data.results || data.results.length === 0) {
         setError(t.noResults)
       }
@@ -138,19 +151,7 @@ export default function SearchPage() {
   const handleBusinessClick = (placeId: string) => {
     // Single-click always selects the clicked business (no toggle to null)
     setSelectedPlaceId(placeId)
-    // Smooth scroll to the card and center it (approx 300ms)
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`business-${placeId}`)
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" })
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Kart bulunamadı",
-          description: "Seçilen harita konumu için kartvizit bulunamadı.",
-        })
-      }
-    })
+    // Auto scroll disabled
   }
 
   useEffect(() => {
@@ -560,19 +561,7 @@ export default function SearchPage() {
                       return
                     }
                     setSelectedPlaceId(placeId)
-                    // Scroll to the corresponding business card smoothly
-                    requestAnimationFrame(() => {
-                      const el = document.getElementById(`business-${placeId}`)
-                      if (el) {
-                        el.scrollIntoView({ behavior: "smooth", block: "center" })
-                      } else {
-                        toast({
-                          variant: "destructive",
-                          title: "Kart bulunamadı",
-                          description: "Seçilen harita konumu için kartvizit bulunamadı.",
-                        })
-                      }
-                    })
+                    // Auto scroll disabled
                   } else {
                     setSelectedPlaceId(null)
                   }
